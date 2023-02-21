@@ -1,0 +1,100 @@
+#include<stdio.h>
+#include <time.h>
+
+#define size 10
+typedef struct bomb
+{
+	int position;
+}Bomb;
+
+void initGrid(char* grid[size * size]);
+void printGrid(char* grid[size * size]);
+void placeBomb(char* grid[size * size]);
+
+
+void main()
+{
+	
+	char* grid[size * size];
+	initGrid(grid);
+	printGrid(grid);
+	placeBomb(grid);
+	printGrid(grid);
+
+};
+
+void initGrid(char* grid[size * size])
+{
+	for (int i = 0; i < size*size; i++)
+	{
+		grid[i] = " . ";
+	};
+};
+
+void printGrid(char* grid[size * size])
+{
+
+	for (int i = 0; i < size * size; i++)
+	{
+		if (i % size == 0 && i != 0)
+		{
+			printf("\n");
+		}
+		printf("%s", grid[i]);
+
+	};
+	printf("\n\n");
+};
+
+void placeBomb(char* grid[size * size])
+{
+	int nbBomb = 0;
+	srand(time(NULL));
+
+	while (nbBomb < size)
+	{
+		int position = rand() % ( size * size + 1 );
+		if (grid[position] != " B ")
+		{
+			grid[position] = " B ";
+			nbBomb++;
+		};
+	};
+};
+
+void placeNb(char* grid[size * size])
+{
+	for (int i = 0; i < size * size; i++)
+	{
+		
+		if (grid[i] != "B")
+		{
+			else
+			{
+				
+			};
+			+if - 1[i]
+			nb += ifBomb(i + 1, grid);
+			nb += ifBomb(i - size, grid);
+			nb += ifBomb(i - size - 1, grid);
+			nb += ifBomb(i - size + 1, grid);
+			nb += ifBomb(i + size - 1, grid);
+			nb += ifBomb(i + size + 1, grid);
+			nb += ifBomb(i + size, grid);
+		}
+	};
+};
+
+int ifBomb(int i, char* grid[size * size])
+{
+	int nbBomb = 0;
+	if (i > 0 && i < 100)
+	{
+		if (grid[i] == " B ")
+		{
+			nbBomb = 1;
+		};
+	};
+	return nbBomb;
+
+}
