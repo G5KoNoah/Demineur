@@ -1,390 +1,434 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
-//#define size 11
+
 int size = 0;
 
-void initGrid(int *grid);
-void initGridPlayer(int *gridPlayer);
-void printGridPlayer(int *gridPlayer);
-void placeBomb(int *grid, int place, int nb);
-void placeNb(int *grid);
-int ifBomb(int i, int *grid);
-int play(char choice, int place, int *gridPlayer, int *grid);
-void inputFlag(char *choice);
-void inputCase(int *line, int *column);
-void inputNbBomb(int *nbBomb);
-int verifWin(int *gridPlayer, int nbBomb, int *grid);
-void verifError(int *numError, int *gridPlayer, int *grid, char choice,
-                int place);
-void printError(int *numError);
-void inputSize(int *size);
-void removePosition(int position, int index[size * size], int * nbRemove);
+void initGrid(int* grid);
+void initGridPlayer(int* gridPlayer);
+void printGridPlayer(int* gridPlayer);
+void placeBomb(int* grid, int place, int nb);
+void placeNb(int* grid);
+int ifBomb(int i, int* grid);
+int play(char choice, int place, int* gridPlayer, int* grid);
+void inputFlag(char* choice);
+void inputCase(int* line, int* column);
+void inputNbBomb(int* nbBomb);
+int verifWin(int* gridPlayer, int nbBomb, int* grid);
+void verifError(int* numError, int* gridPlayer, int* grid, char choice,
+    int place);
+void printError(int* numError);
+void inputSize(int* size);
+void removePosition(int position, int* index, int* nbRemove);
+void inputReplay();
 
 int main() {
-  inputSize(&size);
-  int *grid = malloc(sizeof(int) * (size * size));
-  int *gridPlayer = malloc(sizeof(int) * (size * size));
-  initGrid(grid);
-  initGridPlayer(gridPlayer);
-  printGridPlayer(gridPlayer);
+    inputSize(&size);
+    int* grid = malloc(sizeof(int) * (size * size));
+    int* gridPlayer = malloc(sizeof(int) * (size * size));
+    initGrid(grid);
+    initGridPlayer(gridPlayer);
+    printGridPlayer(gridPlayer);
 
-  /** Creation grille + 1er round**/
+    /** Creation grille + 1er round**/
 
-  int nbBomb;
-  inputNbBomb(&nbBomb);
-  char choice = 'C';
-  int numError = 0;
-  int line;
-  int column;
-  inputCase(&line, &column);
-  int place = (line - 1) + (column - 1) * size;
-  placeBomb(grid, place, nbBomb);
-  placeNb(grid);
-  play(choice, place, gridPlayer, grid);
-  printGridPlayer(gridPlayer);
-  int finish = 0;
-  int explode = 0;
-  finish = verifWin(gridPlayer, nbBomb, grid);
-
-  while (explode == 0 && finish == 0) {
-    inputFlag(&choice);
+    int nbBomb;
+    inputNbBomb(&nbBomb);
+    char choice = 'C';
+    int numError = 0;
+    int line;
+    int column;
     inputCase(&line, &column);
     int place = (line - 1) + (column - 1) * size;
-    verifError(&numError, gridPlayer, grid, choice, place);
-    explode = play(choice, place, gridPlayer, grid);
+    placeBomb(grid, place, nbBomb);
+    placeNb(grid);
+    play(choice, place, gridPlayer, grid);
     printGridPlayer(gridPlayer);
-    printError(&numError);
+    int finish = 0;
+    int explode = 0;
     finish = verifWin(gridPlayer, nbBomb, grid);
-  }
-  if (explode == 1) {
-    printf("T'as Perdu !!!");
-  } else {
-    printf("T'as Gagné Bravo !!!!!!");
-  }
-  free(grid);
-  free(gridPlayer);
-}
 
-void initGrid(int *grid) {
-  for (int i = 0; i < size * size; i++) {
-    grid[i] = 33;
-  }
-}
-
-void initGridPlayer(int *gridPlayer) {
-  for (int i = 0; i < size * size; i++) {
-    gridPlayer[i] = 33;
-  }
-}
-
-void printGridPlayer(int *gridPlayer) {
-  /*if (system("cls"))
-    system("clear");*/
-  printf("     ");
-  for (int y = 1; y < size + 1; y++) {
-    printf((y > 9) ? "%d " : "%d  ", y);
-  }
-  printf("\n");
-  printf("    ");
-  for (int y = 1; y < size + 1; y++) {
-    printf("---");
-  }
-  printf("\n");
-
-  int count = size * size;
-  for (int i = 0; i < count; i++) {
-    if (i == 0) {
-      printf(" 1");
-      printf(" ");
-      printf("|");
+    while (explode == 0 && finish == 0) {
+        inputFlag(&choice);
+        inputCase(&line, &column);
+        int place = (line - 1) + (column - 1) * size;
+        verifError(&numError, gridPlayer, grid, choice, place);
+        explode = play(choice, place, gridPlayer, grid);
+        printGridPlayer(gridPlayer);
+        printError(&numError);
+        finish = verifWin(gridPlayer, nbBomb, grid);
     }
-    if (i % size == 0 && i != 0) {
-
-      printf("\n");
-      printf((i / size + 1 > 9) ? "%d" : " %d", i / size + 1);
-      printf(" ");
-      printf("|");
+    if (explode == 1) {
+        printf("T'as Perdu !!!");
     }
-    if (gridPlayer[i] == 33) {
-      printf("\033[47m");
-      // printf("\033[0m");
-      printf(" . ");
-    } else if (gridPlayer[i] == 66) {
-      printf("\033[40m");
-      // printf("\033[0;30m");
-      printf(" B ");
-      // printf(" %s", "💣")
-    } else if (gridPlayer[i] == 55) {
-      printf("\033[1;91;47m");
-      // printf("\033[0m");
-      printf(" D ");
-      // printf(" %s", "🚩")
-    } else if (gridPlayer[i] == 0) {
-      printf("   ");
-    } else {
-      if (gridPlayer[i] == 1) {
-        printf("\033[44m");
-        // printf("\033[0;34m");
-      } else if (gridPlayer[i] == 2) {
-        printf("\033[42m");
-        // printf("\033[0;32m");
-      } else if (gridPlayer[i] == 3) {
-        printf("\033[41m");
-        // printf("\033[0;31m");
-      } else if (gridPlayer[i] == 4) {
-        printf("\033[45m");
-        // printf("\033[0;35m");
-      } else if (gridPlayer[i] == 5) {
-        printf("\033[43m");
-        // printf("\033[0;33m");
-      } else {
-        printf("\033[46m");
-        // printf("\033[0;36m");
+    else {
+        printf("T'as Gagne Bravo !!!!!!");
+    }
+    printf("\n");
+    free(grid);
+    free(gridPlayer);
+    inputReplay();
+}
+
+void initGrid(int* grid) {
+    for (int i = 0; i < size * size; i++) {
+        grid[i] = 33;
+    }
+}
+
+void initGridPlayer(int* gridPlayer) {
+    for (int i = 0; i < size * size; i++) {
+        gridPlayer[i] = 33;
+    }
+}
+
+void printGridPlayer(int* gridPlayer) {
+    if (system("cls"))
+        system("clear");
+    printf("     ");
+    for (int y = 1; y < size + 1; y++) {
+        printf((y > 9) ? "%d " : "%d  ", y);
+    }
+    printf("\n");
+    printf("    ");
+    for (int y = 1; y < size + 1; y++) {
+        printf("---");
+    }
+    printf("\n");
+
+    int count = size * size;
+    for (int i = 0; i < count; i++) {
+        if (i == 0) {
+            printf(" 1");
+            printf(" ");
+            printf("|");
+        }
+        if (i % size == 0 && i != 0) {
+
+            printf("\n");
+            printf((i / size + 1 > 9) ? "%d" : " %d", i / size + 1);
+            printf(" ");
+            printf("|");
+        }
+        if (gridPlayer[i] == 33) {
+            printf("\033[47m");
+            // printf("\033[0m");
+            printf(" . ");
+        }
+        else if (gridPlayer[i] == 66) {
+            printf("\033[40m");
+            // printf("\033[0;30m");
+            printf(" B ");
+            // printf(" %s", "💣")
+        }
+        else if (gridPlayer[i] == 55) {
+            printf("\033[1;91;47m");
+            // printf("\033[0m");
+            printf(" D ");
+            // printf(" %s", "🚩")
+        }
+        else if (gridPlayer[i] == 0) {
+            printf("   ");
+        }
+        else {
+            if (gridPlayer[i] == 1) {
+                printf("\033[44m");
+                // printf("\033[0;34m");
+            }
+            else if (gridPlayer[i] == 2) {
+                printf("\033[42m");
+                // printf("\033[0;32m");
+            }
+            else if (gridPlayer[i] == 3) {
+                printf("\033[41m");
+                // printf("\033[0;31m");
+            }
+            else if (gridPlayer[i] == 4) {
+                printf("\033[45m");
+                // printf("\033[0;35m");
+            }
+            else if (gridPlayer[i] == 5) {
+                printf("\033[43m");
+                // printf("\033[0;33m");
+            }
+            else {
+                printf("\033[46m");
+                // printf("\033[0;36m");
+            }
+            printf(" %d ", gridPlayer[i]);
+        }
+        printf("\033[0m");
+    }
+
+    printf("\n\n");
+}
+
+void placeBomb(int* grid, int place, int nb) {
+    /*int nbBomb = 0;
+    srand(time(NULL));
+
+    while (nbBomb < nb) {
+      int position = rand() % (size * size);
+
+      if (ifBomb(position, grid) == 0 && position != place &&
+          position != place + 1 && position != place - 1 &&
+          position != place - size - 1 && position != place - size + 1 &&
+          position != place + size - 1 && position != place + size + 1 &&
+          position != place - size && position != place + size) {
+        grid[position] = 66;
+        nbBomb++;
       }
-      printf(" %d ", gridPlayer[i]);
+    }*/
+    int* index = malloc(sizeof(int) * (size * size));
+    for (int i = 0; i < size * size; i++) {
+        index[i] = i;
     }
-    printf("\033[0m");
-  }
+    int nbRemove = 1;
+    int lastPosition = place;
 
-  printf("\n\n");
+    removePosition(place + size + 1, index, &nbRemove);
+    removePosition(place + size, index, &nbRemove);
+    removePosition(place + size - 1, index, &nbRemove);
+    removePosition(place + 1, index, &nbRemove);
+    removePosition(place, index, &nbRemove);
+    removePosition(place - 1, index, &nbRemove);
+    removePosition(place - size + 1, index, &nbRemove);
+    removePosition(place - size, index, &nbRemove);
+    removePosition(place - size - 1, index, &nbRemove);
+
+    for (int i = 0; i < nb; i++) {
+        int ind = rand() % (size * size - (i + 9));
+        int position = index[ind];
+        removePosition(ind, index, &nbRemove);
+        grid[position] = 66;
+    }
 }
 
-void placeBomb(int *grid, int place, int nb) {
-  srand(time(NULL));
-
-  /**while (nbBomb < nb) {
-    int position = rand() % (size * size);
-
-    if (ifBomb(position, grid) == 0 && position != place &&
-        position != place + 1 && position != place - 1 &&
-        position != place - size - 1 && position != place - size + 1 &&
-        position != place + size - 1 && position != place + size + 1 &&
-        position != place - size && position != place + size) {
-      grid[position] = 66;
-      nbBomb++;
-    }
-  }**/
-  int index[size * size];
-  for (int i = 0; i < size * size; i++) {
-    index[i] = i;
-  }
-  int nbRemove = 1;
-  removePosition(place, index, &nbRemove);
-  removePosition(place + 1, index, &nbRemove);
-  removePosition(place - 1, index, &nbRemove);
-  removePosition(place + size, index, &nbRemove);
-  removePosition(place - size, index, &nbRemove);
-  removePosition(place + size + 1, index, &nbRemove);
-  removePosition(place + size - 1, index, &nbRemove);
-  removePosition(place - size + 1, index, &nbRemove);
-  removePosition(place - size - 1, index, &nbRemove);
-
-  for (int i = 0; i < nb; i++) {
-    int ind = rand() % (size * size - i);
-    int position = index[ind];
-    removePosition(ind, index, &nbRemove);
-    grid[position] = 66;
-  }
-}
-
-void removePosition(int position, int index[size * size], int * nbRemove) {
-  if (position >= 0 && position < size * size) {
-    printf("%d",*nbRemove);
+void removePosition(int position, int* index, int* nbRemove) {
     int lenght = (size * size) - *nbRemove;
-    for (int j = position; j < lenght; j++) {
-      index[j] = index[j + 1];
-    }
-    *nbRemove++;
-  }
-  for (int i = 0; i < size * size; i++) {
-    printf("%d ", index[i]);
-  }
-  printf("\n");
-}
-
-void placeNb(int *grid) {
-  for (int i = 0; i < size * size; i++) {
-
-    if (grid[i] != 66) {
-      int nb = 0;
-      if (i % size == 0) {
-        nb += ifBomb(i + size, grid);
-        nb += ifBomb(i - size, grid);
-        nb += ifBomb(i + 1, grid);
-        nb += ifBomb((i - size) + 1, grid);
-        nb += ifBomb((i + size) + 1, grid);
-      } else if (i % size == size - 1) {
-        nb += ifBomb(i + size, grid);
-        nb += ifBomb(i - size, grid);
-        nb += ifBomb(i - 1, grid);
-        nb += ifBomb((i - size) - 1, grid);
-        nb += ifBomb((i + size) - 1, grid);
-      } else {
-        nb += ifBomb(i + size, grid);
-        nb += ifBomb(i - size, grid);
-        nb += ifBomb(i + 1, grid);
-        nb += ifBomb((i - size) + 1, grid);
-        nb += ifBomb((i + size) + 1, grid);
-        nb += ifBomb(i - 1, grid);
-        nb += ifBomb((i - size) - 1, grid);
-        nb += ifBomb((i + size) - 1, grid);
-      }
-      grid[i] = nb;
-    }
-  }
-}
-
-int ifBomb(int i, int *grid) {
-  int nbBomb = 0;
-  if (i >= 0 && i < size * size) {
-    if (grid[i] == 66) {
-      nbBomb = 1;
-    }
-  }
-  return nbBomb;
-}
-
-int play(char choice, int place, int *gridPlayer, int *grid) {
-  if (gridPlayer[place] == 33) {
-    if (choice == 'C') {
-      gridPlayer[place] = grid[place];
-
-      if (grid[place] == 66) {
-        for (int i = 0; i < size * size; i++) {
-          if (grid[i] == 66 && gridPlayer[i] != 55) {
-            gridPlayer[i] = grid[i];
-          }
+    if (position >= 0 && position < size * size) {
+        for (int j = position; j < lenght; j++) {
+            index[j] = index[j + 1];
         }
+        ++* nbRemove;
+    }
+}
+
+void placeNb(int* grid) {
+    for (int i = 0; i < size * size; i++) {
+
+        if (grid[i] != 66) {
+            int nb = 0;
+            if (i % size == 0) {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i + 1, grid);
+                nb += ifBomb((i - size) + 1, grid);
+                nb += ifBomb((i + size) + 1, grid);
+            }
+            else if (i % size == size - 1) {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i - 1, grid);
+                nb += ifBomb((i - size) - 1, grid);
+                nb += ifBomb((i + size) - 1, grid);
+            }
+            else {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i + 1, grid);
+                nb += ifBomb((i - size) + 1, grid);
+                nb += ifBomb((i + size) + 1, grid);
+                nb += ifBomb(i - 1, grid);
+                nb += ifBomb((i - size) - 1, grid);
+                nb += ifBomb((i + size) - 1, grid);
+            }
+            grid[i] = nb;
+        }
+    }
+}
+
+int ifBomb(int i, int* grid) {
+    int nbBomb = 0;
+    if (i >= 0 && i < size * size) {
+        if (grid[i] == 66) {
+            nbBomb = 1;
+        }
+    }
+    return nbBomb;
+}
+
+int play(char choice, int place, int* gridPlayer, int* grid) {
+    if (gridPlayer[place] == 33) {
+        if (choice == 'C') {
+            gridPlayer[place] = grid[place];
+
+            if (grid[place] == 66) {
+                for (int i = 0; i < size * size; i++) {
+                    if (grid[i] == 66 && gridPlayer[i] != 55) {
+                        gridPlayer[i] = grid[i];
+                    }
+                }
+                return 1;
+            }
+            else if (grid[place] == 0) {
+                if (place % size == 0) {
+
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place + 1, gridPlayer, grid);
+                    play(choice, place + size + 1, gridPlayer, grid);
+                    play(choice, place - size + 1, gridPlayer, grid);
+
+                }
+                else if (place % size == size - 1) {
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place - 1, gridPlayer, grid);
+                    play(choice, place + size - 1, gridPlayer, grid);
+                    play(choice, place - size - 1, gridPlayer, grid);
+                }
+                else {
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place + 1, gridPlayer, grid);
+                    play(choice, place - 1, gridPlayer, grid);
+                    play(choice, place + size + 1, gridPlayer, grid);
+                    play(choice, place - size + 1, gridPlayer, grid);
+                    play(choice, place + size - 1, gridPlayer, grid);
+                    play(choice, place - size - 1, gridPlayer, grid);
+                }
+            }
+        }
+        else if (choice == 'D') {
+            gridPlayer[place] = 55;
+        }
+    }
+    else if (choice == 'E' && gridPlayer[place] == 55) {
+        gridPlayer[place] = 33;
+    }
+    return 0;
+}
+
+void inputNbBomb(int* nbBomb) {
+    printf("Combien de bombes voulez avoir a chercher (entre 1 et %d): ",
+        size * size - 9);
+    scanf_s("%d", nbBomb);
+    while (getchar() != '\n')
+        ;
+    while (*nbBomb < 1 || *nbBomb > size * size - 9) {
+        printf("Un Nombres de bombes entre 1 et %d: ", size * size - 9);
+        scanf_s("%d", nbBomb);
+        while (getchar() != '\n')
+            ;
+    }
+}
+
+void inputFlag(char* choice) {
+    printf("Veux tu mettre un drapeau (D), en enlever un (E) ou decouvrir une "
+        "case (C): ");
+    scanf_s("%c", choice);
+    while (getchar() != '\n')
+        ;
+    while (*choice != 'D' && *choice != 'C' && *choice != 'E') {
+        printf("Drapeau -> D Supprimer Drapeau -> E Case -> C: ");
+        scanf_s("%c", choice);
+        while (getchar() != '\n')
+            ;
+    }
+}
+
+void inputCase(int* line, int* column) {
+    printf("Entrer la position que vous souhaiter (ex : 2 8): ");
+    scanf_s("%d%d", line, column);
+    while (getchar() != '\n')
+        ;
+    while (*line < 1 || *line > size || *column < 1 || *column > size) {
+        printf("Entrer une position valide (ex : 2 8): ");
+        scanf_s("%d%d", line, column);
+        while (getchar() != '\n')
+            ;
+    }
+}
+
+void inputSize(int* size) {
+    printf("Quel tailles de grille veux tu ? (entre 4 et 30) (ex : 10): ");
+    scanf_s("%d", size);
+    while (getchar() != '\n')
+        ;
+    while (*size < 4 || *size > 30) {
+        printf("Rentrez une taille valide (superieur a 3) (ex : 10): ");
+        scanf_s("%d", size);
+        while (getchar() != '\n')
+            ;
+    }
+}
+
+void inputReplay()
+{
+    char replay[4];
+    printf("Veux tu rejouer ?: ");
+    int error = scanf_s("%s", replay, 4);
+    while (getchar() != '\n');
+    while (error == 0 || (strcmp("oui", replay) != 0 && strcmp("non", replay) != 0)) {
+        printf("Rejouer ? (oui ou non): ");
+        error = scanf_s("%s", replay, 4);
+        while (getchar() != '\n');
+    }
+    if (strcmp("oui", replay) == 0) {
+        main();
+    }
+    else {
+        printf("Bonne journee");
+    }
+}
+
+int verifWin(int* gridPlayer, int nbBomb, int* grid) {
+    int count = 0;
+    for (int i = 0; i < size * size; i++) {
+        if (gridPlayer[i] == 33) {
+            count++;
+        }
+        else if (gridPlayer[i] == 55 && grid[i] == 66) {
+            count++;
+        }
+    }
+    if (count == nbBomb) {
         return 1;
-      } else if (grid[place] == 0) {
-        if (place % size == 0) {
+    }
+    return 0;
+}
 
-          play(choice, place + size, gridPlayer, grid);
-          play(choice, place - size, gridPlayer, grid);
-          play(choice, place + 1, gridPlayer, grid);
-          play(choice, place + size + 1, gridPlayer, grid);
-          play(choice, place - size + 1, gridPlayer, grid);
-
-        } else if (place % size == size - 1) {
-          play(choice, place + size, gridPlayer, grid);
-          play(choice, place - size, gridPlayer, grid);
-          play(choice, place - 1, gridPlayer, grid);
-          play(choice, place + size - 1, gridPlayer, grid);
-          play(choice, place - size - 1, gridPlayer, grid);
-        } else {
-          play(choice, place + size, gridPlayer, grid);
-          play(choice, place - size, gridPlayer, grid);
-          play(choice, place + 1, gridPlayer, grid);
-          play(choice, place - 1, gridPlayer, grid);
-          play(choice, place + size + 1, gridPlayer, grid);
-          play(choice, place - size + 1, gridPlayer, grid);
-          play(choice, place + size - 1, gridPlayer, grid);
-          play(choice, place - size - 1, gridPlayer, grid);
+void verifError(int* numError, int* gridPlayer, int* grid, char choice,
+    int place) {
+    if (choice == 'E') {
+        if (gridPlayer[place] != 33 && gridPlayer[place] != 55) {
+            *numError = 1;
         }
-      }
-    } else if (choice == 'D') {
-      gridPlayer[place] = 55;
+        else if (gridPlayer[place] != 55) {
+            *numError = 2;
+        }
     }
-  } else if (choice == 'E' && gridPlayer[place] == 55) {
-    gridPlayer[place] = 33;
-  }
-  return 0;
-}
-
-void inputNbBomb(int *nbBomb) {
-  printf("Combien de bombes voulez avoir à chercher (entre 1 et %d): ",
-         size * size - 9);
-  scanf("%d", nbBomb);
-  while (getchar() != '\n')
-    ;
-  while (*nbBomb < 1 || *nbBomb > size * size - 9) {
-    printf("Un Nombres de bombes entre 1 et %d: ", size * size - 9);
-    scanf("%d", nbBomb);
-    while (getchar() != '\n')
-      ;
-  }
-}
-
-void inputFlag(char *choice) {
-  printf("Veux tu mettre un drapeau (D), en enlever un (E) ou découvrir une "
-         "case (C): ");
-  scanf("%c", choice);
-  while (getchar() != '\n')
-    ;
-  while (*choice != 'D' && *choice != 'C' && *choice != 'E') {
-    printf("Drapeau -> D Supprimer Drapeau -> E Case -> C: ");
-    scanf("%c", choice);
-    while (getchar() != '\n')
-      ;
-  }
-}
-
-void inputCase(int *line, int *column) {
-  printf("Entrer la position que vous souhaiter (ex : 2 8): ");
-  scanf("%d%d", line, column);
-  while (getchar() != '\n')
-    ;
-  while (*line < 1 || *line > size || *column < 1 || *column > size) {
-    printf("Entrer une position valide (ex : 2 8): ");
-    scanf("%d%d", line, column);
-    while (getchar() != '\n')
-      ;
-  }
-}
-
-void inputSize(int *size) {
-  printf("Quel tailles de grille veux tu ? (entre 4 et 30) (ex : 10): ");
-  scanf("%d", size);
-  while (getchar() != '\n')
-    ;
-  while (*size < 4 || *size > 30) {
-    printf("Rentrez une taille valide (supérieur à 3) (ex : 10): ");
-    scanf("%d", size);
-    while (getchar() != '\n')
-      ;
-  }
-}
-
-int verifWin(int *gridPlayer, int nbBomb, int *grid) {
-  int count = 0;
-  for (int i = 0; i < size * size; i++) {
-    if (gridPlayer[i] == 33) {
-      count++;
-    } else if (gridPlayer[i] == 55 && grid[i] == 66) {
-      count++;
+    else if (choice == 'C' && gridPlayer[place] == 55) {
+        *numError = 3;
     }
-  }
-  if (count == nbBomb) {
-    return 1;
-  }
-  return 0;
-}
-
-void verifError(int *numError, int *gridPlayer, int *grid, char choice,
-                int place) {
-  if (choice == 'E') {
-    if (gridPlayer[place] != 33 && gridPlayer[place] != 55) {
-      *numError = 1;
-    } else if (gridPlayer[place] != 55) {
-      *numError = 2;
+    else if (gridPlayer[place] != 33) {
+        *numError = 1;
     }
-  } else if (choice == 'C' && gridPlayer[place] == 55) {
-    *numError = 3;
-  } else if (gridPlayer[place] != 33) {
-    *numError = 1;
-  }
 }
 
-void printError(int *numError) {
-  if (*numError == 1) {
-    printf("Case déjà découverte !!");
-  } else if (*numError == 2) {
-    printf("Ce n'est pas un drapeau !!");
-  } else if (*numError == 3) {
-    printf("Enlevez le drapeau avant de pouvoir découvrir cette case !!");
-  }
-  printf("\n");
-  *numError = 0;
+void printError(int* numError) {
+    if (*numError == 1) {
+        printf("Case deja decouverte !!");
+    }
+    else if (*numError == 2) {
+        printf("Ce n'est pas un drapeau !!");
+    }
+    else if (*numError == 3) {
+        printf("Enlevez le drapeau avant de pouvoir decouvrir cette case !!");
+    }
+    printf("\n");
+    *numError = 0;
 }
