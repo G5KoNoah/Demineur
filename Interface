@@ -7,6 +7,9 @@ int main()
 {
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
+	SDL_Color orange = { 255, 127, 40, 255 };
+	SDL_Color drakOrange = { 255, 100, 80, 255 };
+	SDL_Color rose = { 200, 50, 150, 255 };
 	int statut = EXIT_FAILURE;
 	if (0 != SDL_Init(SDL_INIT_EVERYTHING))
 	{
@@ -28,11 +31,22 @@ int main()
 		goto Quit;
 	}
 
-	const char* SDL_GetWindowTitle(window);
 	SDL_SetWindowTitle(window, "Demineur");
 	SDL_RaiseWindow(window);
 
-	SDL_Rect rect = {0, 0, 10,10};
+	for (int i = 0; i < 10; i = i++) {
+		for (int j = 0; j < 10; j++) {
+			SDL_Rect rect = { j + (30 * j), i + (30 * i), 30,30 };
+			if (j % 2 == 0) {
+				SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
+			}
+			else {
+				SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+			}
+			SDL_RenderFillRect(renderer, &rect);
+			SDL_RenderPresent(renderer);
+		}
+	}
 
 	statut = EXIT_SUCCESS;
 	SDL_Delay(3000);
