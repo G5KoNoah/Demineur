@@ -1,15 +1,15 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
+void initGridPlayer(SDL_Renderer* renderer);
 
 int main()
 {
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
 	SDL_Color orange = { 255, 127, 40, 255 };
-	SDL_Color drakOrange = { 255, 100, 80, 255 };
-	SDL_Color rose = { 200, 50, 150, 255 };
 	int statut = EXIT_FAILURE;
 	if (0 != SDL_Init(SDL_INIT_EVERYTHING))
 	{
@@ -33,23 +33,29 @@ int main()
 
 	SDL_SetWindowTitle(window, "Demineur");
 	SDL_RaiseWindow(window);
+	statut = EXIT_SUCCESS;
+	initGridPlayer(renderer);
+	SDL_Event event;
+	SDL_bool quit = SDL_FALSE;
 
-	for (int i = 0; i < 10; i = i++) {
-		for (int j = 0; j < 10; j++) {
-			SDL_Rect rect = { j + (30 * j), i + (30 * i), 30,30 };
-			if (j % 2 == 0) {
-				SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
-			}
-			else {
-				SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
-			}
-			SDL_RenderFillRect(renderer, &rect);
-			SDL_RenderPresent(renderer);
-		}
+	clock_t deltaTime = 0;
+	unsigned int frames = 0;
+	
+
+	while (!quit) {
+		int begin = SDL_GetTicks();
+
+		SDL_WaitEvent(&event);
+		if (event.type == SDL_QUIT)
+			quit = SDL_TRUE;
+		if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
+			printf("clic gauche");
+
+		deltaTime += SDL_GetTicks() - begin;
+		frames++;
+		printf("%d\n", 1000 / deltaTime);
 	}
 
-	statut = EXIT_SUCCESS;
-	SDL_Delay(3000);
 Quit:
 	if (NULL != renderer)
 		SDL_DestroyRenderer(renderer);
@@ -57,4 +63,38 @@ Quit:
 		SDL_DestroyWindow(window);
 	SDL_Quit();
 	return statut;
+}
+
+void initGridPlayer(SDL_Renderer* renderer) {
+    SDL_Color drakOrange = { 255, 100, 80, 255 };
+    SDL_Color rose = { 200, 50, 150, 255 };
+
+    for (int i = 0; i < 10; i = i++) {
+        for (int j = 0; j < 10; j++) {
+            SDL_Rect rect = { j + (30 * j), i + (30 * i), 30,30 };
+            if (j % 2 == 0) {
+                SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
+            }else {
+                SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+            }
+            SDL_RenderFillRect(renderer, &rect);
+            SDL_RenderPresent(renderer);
+        }
+    }
+}
+
+
+void game() 
+{
+    //INIT
+
+    while (1) 
+    {
+        //EVENT
+        //UPDATE
+        //RENDER
+    }
+
+    //DESTROY
+
 }
