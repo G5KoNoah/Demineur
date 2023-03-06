@@ -1,75 +1,163 @@
+#include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <SDL_mixer.h>
+#include <SDL_image.h>
 
-
-int size = 0;
+int size = 11;
+int sizeBox = 50;
 
 void initGrid(int* grid);
-void initGridPlayer(int* gridPlayer);
-void printGridPlayer(int* gridPlayer);
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer);
 void placeBomb(int* grid, int place, int nb);
 void placeNb(int* grid);
 int ifBomb(int i, int* grid);
-int play(char choice, int place, int* gridPlayer, int* grid);
-void inputFlag(char* choice);
-void inputCase(int* line, int* column);
-void inputNbBomb(int* nbBomb);
+int play(int place, int* gridPlayer, int* grid);
 int verifWin(int* gridPlayer, int nbBomb, int* grid);
-void verifError(int* numError, int* gridPlayer, int* grid, char choice,
-    int place);
-void printError(int* numError);
-void inputSize(int* size);
 void removePosition(int position, int* index, int* nbRemove);
-void inputReplay();
+void flag(int place, int* gridPlayer);
+void initGridPlayer(int* gridPlayer);
+int transformCoord(int x, int y);
 
-int main() {
-    inputSize(&size);
+int main()
+{
+    SDL_Window* window = NULL;
+    SDL_Renderer* renderer = NULL;
+    SDL_Color orange = { 255, 127, 40, 255 };
+    int statut = EXIT_FAILURE;
+
+    if (0 != SDL_Init(SDL_INIT_EVERYTHING))
+    {
+        fprintf(stderr, "Erreur SDL_Init : %s", SDL_GetError());
+        goto Quit;
+    }
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 0) == -1)// création de la configuration de la carte son
+    {
+        SDL_Log("Erreur initialisation SDL_mixer : %s", Mix_GetError());
+        goto Quit;
+    }
+
+    Mix_Music* music = Mix_LoadMUS("music/overtaken.mp3");
+
+    if (music == NULL)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
+        goto Quit;
+    }
+
+    SDL_Surface* image = IMG_Load("images/hide1.png");
+
+
+	/*if (Mix_OpenAudio(96000, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 1024) < 0) */
+    
+
+
+	Mix_PlayMusic(music, -1); // Joue notre musique
+
+
+    window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        size * (sizeBox + 1), size * (sizeBox + 1), SDL_WINDOW_SHOWN);
+    if (NULL == window)
+    {
+        fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
+        goto Quit;
+    }
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (NULL == renderer)
+    {
+        fprintf(stderr, "Erreur SDL_CreateRenderer : %s", SDL_GetError());
+        goto Quit;
+    }
+
+    SDL_SetWindowTitle(window, "Demineur");
+    SDL_RaiseWindow(window);
+    statut = EXIT_SUCCESS;
+    SDL_Event event;
+    SDL_bool quit = SDL_FALSE;
+
+    clock_t deltaTime = 0;
+    unsigned int frames = 0;
+
     int* grid = malloc(sizeof(int) * (size * size));
     int* gridPlayer = malloc(sizeof(int) * (size * size));
-    initGrid(grid);
-    initGridPlayer(gridPlayer);
-    printGridPlayer(gridPlayer);
 
-    /** Creation grille + 1er round**/
+    int nbBomb = 30;
+    
 
-    int nbBomb;
-    inputNbBomb(&nbBomb);
-    char choice = 'C';
-    int numError = 0;
-    int line;
-    int column;
-    inputCase(&line, &column);
-    int place = (line - 1) + (column - 1) * size;
-    placeBomb(grid, place, nbBomb);
-    placeNb(grid);
-    play(choice, place, gridPlayer, grid);
-    printGridPlayer(gridPlayer);
-    int finish = 0;
-    int explode = 0;
-    finish = verifWin(gridPlayer, nbBomb, grid);
-
-    while (explode == 0 && finish == 0) {
-        inputFlag(&choice);
-        inputCase(&line, &column);
-        int place = (line - 1) + (column - 1) * size;
-        verifError(&numError, gridPlayer, grid, choice, place);
-        explode = play(choice, place, gridPlayer, grid);
-        printGridPlayer(gridPlayer);
-        printError(&numError);
+    while (!quit) {
+        int begin = SDL_GetTicks();
+        initGrid(grid);
+        initGridPlayer(gridPlayer);
+        printGridPlayer(gridPlayer, renderer);
+        int firstRound = 0;
+        
+        while ((SDL_PollEvent(&event) || firstRound == 0) && !quit) {
+            if (event.type == SDL_QUIT)
+                quit = SDL_TRUE;
+            if (event.type == SDL_MOUSEBUTTONUP) {
+                int place = transformCoord(event.button.x, event.button.y);
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    initGridPlayer(gridPlayer);
+                    placeBomb(grid, place, nbBomb);
+                    placeNb(grid);
+                    play(place, gridPlayer, grid);
+                    firstRound = 1;
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    flag(place, gridPlayer);
+                }
+                printGridPlayer(gridPlayer, renderer);
+            }
+        }
+        int finish = 0;
+        int explode = 0;
         finish = verifWin(gridPlayer, nbBomb, grid);
+        while ((SDL_PollEvent(&event) || explode == 0 && finish == 0 ) && !quit) {
+            if (event.type == SDL_MOUSEBUTTONUP) {
+                int place = transformCoord(event.button.x, event.button.y);
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    explode = play(place, gridPlayer, grid);
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    flag(place, gridPlayer);
+                }
+            } else if (event.type == SDL_QUIT) {
+                quit = SDL_TRUE;
+            }  
+            printGridPlayer(gridPlayer, renderer);
+            finish = verifWin(gridPlayer, nbBomb, grid);
+        }
+
+        deltaTime += SDL_GetTicks() - begin;
+        frames++;
+        printf("%d\n", 1000 / deltaTime);
+        int replay;
+        printf("replay ?");
+        scanf_s("%d", &replay);
+        if (replay == 0) {
+            quit = SDL_TRUE;
+        }
     }
-    if (explode == 1) {
-        printf("T'as Perdu !!!");
-    }
-    else {
-        printf("T'as Gagne Bravo !!!!!!");
-    }
-    printf("\n");
-    free(grid);
-    free(gridPlayer);
-    inputReplay();
+
+Quit:
+    if (NULL != renderer)
+        SDL_DestroyRenderer(renderer);
+    if (NULL != window)
+        SDL_DestroyWindow(window);
+
+    //if (NULL != music)
+    //{
+    //    Mix_FreeMusic(music); // Libére en mémoire notre musique
+    //}
+	    
+	Mix_CloseAudio(); // Quitter correctement SDL_Mixer
+    SDL_Quit();
+
+    return statut;
 }
 
 void initGrid(int* grid) {
@@ -84,103 +172,85 @@ void initGridPlayer(int* gridPlayer) {
     }
 }
 
-void printGridPlayer(int* gridPlayer) {
-    if (system("cls"))
-        system("clear");
-    printf("     ");
-    for (int y = 1; y < size + 1; y++) {
-        printf((y > 9) ? "%d " : "%d  ", y);
+int transformCoord(int x, int y) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            if (i + (sizeBox * i) < x && x < (i + (sizeBox * i)) + sizeBox && j + (sizeBox * j) < y && y < (j + (sizeBox * j)) + sizeBox) {
+                return i * size + j;
+            }
+        }
     }
-    printf("\n");
-    printf("    ");
-    for (int y = 1; y < size + 1; y++) {
-        printf("---");
-    }
-    printf("\n");
+    return -1;
+}
 
+
+//void game()
+//{
+//	//INIT
+//
+//	while (1)
+//	{
+//		//EVENT
+//		//UPDATE
+//		//RENDER
+//	}
+//
+//	//DESTROY
+//
+//}
+
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
+    SDL_Color drakOrange = { 255, 100, 80, 255 };
+    SDL_Color rose = { 200, 50, 150, 255 };
+    SDL_Color black = { 0, 0, 0, 255 };
+    SDL_Color red = { 255, 0, 0, 255 };
+    SDL_Color white = { 255, 255, 255, 255 };
     int count = size * size;
     for (int i = 0; i < count; i++) {
-        if (i == 0) {
-            printf(" 1");
-            printf(" ");
-            printf("|");
-        }
-        if (i % size == 0 && i != 0) {
-
-            printf("\n");
-            printf((i / size + 1 > 9) ? "%d" : " %d", i / size + 1);
-            printf(" ");
-            printf("|");
-        }
+        SDL_Rect rect = { i / size + (i / size * sizeBox), i % size + (i % size * sizeBox), sizeBox,sizeBox };
         if (gridPlayer[i] == 33) {
-            printf("\033[47m");
-            // printf("\033[0m");
-            printf(" . ");
+            if (i % 2 == 0) {
+                SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
+            }
+            else {
+                SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+            }
         }
         else if (gridPlayer[i] == 66) {
-            printf("\033[40m");
-            // printf("\033[0;30m");
-            printf(" B ");
-            // printf(" %s", "💣")
+            SDL_SetRenderDrawColor(renderer, black.r, black.g, black.b, black.a);
         }
         else if (gridPlayer[i] == 55) {
-            printf("\033[1;91;47m");
-            // printf("\033[0m");
-            printf(" D ");
-            // printf(" %s", "🚩")
+            SDL_SetRenderDrawColor(renderer, red.r, red.g, red.b, red.a);
         }
         else if (gridPlayer[i] == 0) {
-            printf("   ");
+            SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
         }
         else {
             if (gridPlayer[i] == 1) {
-                printf("\033[44m");
-                // printf("\033[0;34m");
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
             }
             else if (gridPlayer[i] == 2) {
-                printf("\033[42m");
-                // printf("\033[0;32m");
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
             }
             else if (gridPlayer[i] == 3) {
-                printf("\033[41m");
-                // printf("\033[0;31m");
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
             }
             else if (gridPlayer[i] == 4) {
-                printf("\033[45m");
-                // printf("\033[0;35m");
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
             }
             else if (gridPlayer[i] == 5) {
-                printf("\033[43m");
-                // printf("\033[0;33m");
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
             }
             else {
-                printf("\033[46m");
-                // printf("\033[0;36m");
-            }
-            printf(" %d ", gridPlayer[i]);
-        }
-        printf("\033[0m");
-    }
 
-    printf("\n\n");
+            }
+        }
+        SDL_RenderFillRect(renderer, &rect);
+    }
+    SDL_RenderPresent(renderer);
 }
 
 void placeBomb(int* grid, int place, int nb) {
-    /*int nbBomb = 0;
-    srand(time(NULL));
-
-    while (nbBomb < nb) {
-      int position = rand() % (size * size);
-
-      if (ifBomb(position, grid) == 0 && position != place &&
-          position != place + 1 && position != place - 1 &&
-          position != place - size - 1 && position != place - size + 1 &&
-          position != place + size - 1 && position != place + size + 1 &&
-          position != place - size && position != place + size) {
-        grid[position] = 66;
-        nbBomb++;
-      }
-    }*/
     int* index = malloc(sizeof(int) * (size * size));
     for (int i = 0; i < size * size; i++) {
         index[i] = i;
@@ -260,128 +330,56 @@ int ifBomb(int i, int* grid) {
     return nbBomb;
 }
 
-int play(char choice, int place, int* gridPlayer, int* grid) {
+int play(int place, int* gridPlayer, int* grid) {
     if (gridPlayer[place] == 33) {
-        if (choice == 'C') {
-            gridPlayer[place] = grid[place];
+        
+        gridPlayer[place] = grid[place];
 
-            if (grid[place] == 66) {
-                for (int i = 0; i < size * size; i++) {
-                    if (grid[i] == 66 && gridPlayer[i] != 55) {
-                        gridPlayer[i] = grid[i];
-                    }
-                }
-                return 1;
-            }
-            else if (grid[place] == 0) {
-                if (place % size == 0) {
-
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place + 1, gridPlayer, grid);
-                    play(choice, place + size + 1, gridPlayer, grid);
-                    play(choice, place - size + 1, gridPlayer, grid);
-
-                }
-                else if (place % size == size - 1) {
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place - 1, gridPlayer, grid);
-                    play(choice, place + size - 1, gridPlayer, grid);
-                    play(choice, place - size - 1, gridPlayer, grid);
-                }
-                else {
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place + 1, gridPlayer, grid);
-                    play(choice, place - 1, gridPlayer, grid);
-                    play(choice, place + size + 1, gridPlayer, grid);
-                    play(choice, place - size + 1, gridPlayer, grid);
-                    play(choice, place + size - 1, gridPlayer, grid);
-                    play(choice, place - size - 1, gridPlayer, grid);
+        if (grid[place] == 66) {
+            for (int i = 0; i < size * size; i++) {
+                if (grid[i] == 66 && gridPlayer[i] != 55) {
+                    gridPlayer[i] = grid[i];
                 }
             }
+            return 1;
         }
-        else if (choice == 'D') {
-            gridPlayer[place] = 55;
+        else if (grid[place] == 0) {
+            if (place % size == 0) {
+
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place + 1, gridPlayer, grid);
+                play(place + size + 1, gridPlayer, grid);
+                play(place - size + 1, gridPlayer, grid);
+
+            }
+            else if (place % size == size - 1) {
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place - 1, gridPlayer, grid);
+                play(place + size - 1, gridPlayer, grid);
+                play(place - size - 1, gridPlayer, grid);
+            }
+            else {
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place + 1, gridPlayer, grid);
+                play(place - 1, gridPlayer, grid);
+                play(place + size + 1, gridPlayer, grid);
+                play(place - size + 1, gridPlayer, grid);
+                play(place + size - 1, gridPlayer, grid);
+                play(place - size - 1, gridPlayer, grid);
+            }
         }
-    }
-    else if (choice == 'E' && gridPlayer[place] == 55) {
-        gridPlayer[place] = 33;
     }
     return 0;
 }
 
-void inputNbBomb(int* nbBomb) {
-    printf("Combien de bombes voulez avoir a chercher (entre 1 et %d): ",
-        size * size - 9);
-    scanf_s("%d", nbBomb);
-    while (getchar() != '\n')
-        ;
-    while (*nbBomb < 1 || *nbBomb > size * size - 9) {
-        printf("Un Nombres de bombes entre 1 et %d: ", size * size - 9);
-        scanf_s("%d", nbBomb);
-        while (getchar() != '\n')
-            ;
-    }
-}
-
-void inputFlag(char* choice) {
-    printf("Veux tu mettre un drapeau (D), en enlever un (E) ou decouvrir une "
-        "case (C): ");
-    scanf_s("%c", choice);
-    while (getchar() != '\n')
-        ;
-    while (*choice != 'D' && *choice != 'C' && *choice != 'E') {
-        printf("Drapeau -> D Supprimer Drapeau -> E Case -> C: ");
-        scanf_s("%c", choice);
-        while (getchar() != '\n')
-            ;
-    }
-}
-
-void inputCase(int* line, int* column) {
-    printf("Entrer la position que vous souhaiter (ex : 2 8): ");
-    scanf_s("%d%d", line, column);
-    while (getchar() != '\n')
-        ;
-    while (*line < 1 || *line > size || *column < 1 || *column > size) {
-        printf("Entrer une position valide (ex : 2 8): ");
-        scanf_s("%d%d", line, column);
-        while (getchar() != '\n')
-            ;
-    }
-}
-
-void inputSize(int* size) {
-    printf("Quel tailles de grille veux tu ? (entre 4 et 30) (ex : 10): ");
-    scanf_s("%d", size);
-    while (getchar() != '\n')
-        ;
-    while (*size < 4 || *size > 30) {
-        printf("Rentrez une taille valide (superieur a 3) (ex : 10): ");
-        scanf_s("%d", size);
-        while (getchar() != '\n')
-            ;
-    }
-}
-
-void inputReplay()
-{
-    char replay[4];
-    printf("Veux tu rejouer ?: ");
-    int error = scanf_s("%s", replay, 4);
-    while (getchar() != '\n');
-    while (error == 0 || (strcmp("oui", replay) != 0 && strcmp("non", replay) != 0)) {
-        printf("Rejouer ? (oui ou non): ");
-        error = scanf_s("%s", replay, 4);
-        while (getchar() != '\n');
-    }
-    if (strcmp("oui", replay) == 0) {
-        main();
-    }
-    else {
-        printf("Bonne journee");
+void flag(int place, int* gridPlayer) {
+    if (gridPlayer[place] == 33) {
+        gridPlayer[place] = 55;
+    } else if(gridPlayer[place] == 55){
+        gridPlayer[place] = 33;
     }
 }
 
@@ -399,36 +397,4 @@ int verifWin(int* gridPlayer, int nbBomb, int* grid) {
         return 1;
     }
     return 0;
-}
-
-void verifError(int* numError, int* gridPlayer, int* grid, char choice,
-    int place) {
-    if (choice == 'E') {
-        if (gridPlayer[place] != 33 && gridPlayer[place] != 55) {
-            *numError = 1;
-        }
-        else if (gridPlayer[place] != 55) {
-            *numError = 2;
-        }
-    }
-    else if (choice == 'C' && gridPlayer[place] == 55) {
-        *numError = 3;
-    }
-    else if (gridPlayer[place] != 33) {
-        *numError = 1;
-    }
-}
-
-void printError(int* numError) {
-    if (*numError == 1) {
-        printf("Case deja decouverte !!");
-    }
-    else if (*numError == 2) {
-        printf("Ce n'est pas un drapeau !!");
-    }
-    else if (*numError == 3) {
-        printf("Enlevez le drapeau avant de pouvoir decouvrir cette case !!");
-    }
-    printf("\n");
-    *numError = 0;
 }
