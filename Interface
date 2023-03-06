@@ -2,8 +2,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
-void initGridPlayer(SDL_Renderer* renderer);
+
+int size = 10;
+int sizeBox = 30;
+
+void initGrid(int* grid);
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer);
+void placeBomb(int* grid, int place, int nb);
+void placeNb(int* grid);
+int ifBomb(int i, int* grid);
+int play(char choice, int place, int* gridPlayer, int* grid);
+int verifWin(int* gridPlayer, int nbBomb, int* grid);
+void removePosition(int position, int* index, int* nbRemove);
+
+void initGridPlayer(int* gridPlayer);
+int transformCoord(int x, int y);
 
 int main()
 {
@@ -17,7 +32,7 @@ int main()
 		goto Quit;
 	}
 	window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		640, 480, SDL_WINDOW_SHOWN);
+		size * (sizeBox + 1), size * (sizeBox + 1), SDL_WINDOW_SHOWN);
 	if (NULL == window)
 	{
 		fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
@@ -34,22 +49,54 @@ int main()
 	SDL_SetWindowTitle(window, "Demineur");
 	SDL_RaiseWindow(window);
 	statut = EXIT_SUCCESS;
-	initGridPlayer(renderer);
 	SDL_Event event;
 	SDL_bool quit = SDL_FALSE;
 
 	clock_t deltaTime = 0;
 	unsigned int frames = 0;
-	
+
+    int* grid = malloc(sizeof(int) * (size * size));
+    int* gridPlayer = malloc(sizeof(int) * (size * size));
+
+    int nbBomb = 30;
+
+
 
 	while (!quit) {
 		int begin = SDL_GetTicks();
+        initGrid(grid);
+        initGridPlayer(gridPlayer);
+        printGridPlayer(gridPlayer, renderer);
 
 		SDL_WaitEvent(&event);
 		if (event.type == SDL_QUIT)
 			quit = SDL_TRUE;
-		if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
-			printf("clic gauche");
+        if (event.type == SDL_MOUSEBUTTONUP) {
+            int place = transformCoord(event.button.x, event.button.y);
+            if (event.button.button == SDL_BUTTON_LEFT) {
+                placeBomb(grid, place, nbBomb);
+                placeNb(grid);
+            } else if (event.button.button == SDL_BUTTON_RIGHT) {
+                //a faire
+            }
+            printGridPlayer(gridPlayer, renderer);
+        }
+        int finish = 0;
+        int explode = 0;
+        finish = verifWin(gridPlayer, nbBomb, grid);
+        while (explode == 0 && finish == 0) {
+            if (event.type == SDL_MOUSEBUTTONUP) {
+                int place = transformCoord(event.button.x, event.button.y);
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    /*explode = play(choice, place, gridPlayer, grid);*/
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    //a faire
+                }
+            }
+            printGridPlayer(gridPlayer, renderer);
+            finish = verifWin(gridPlayer, nbBomb, grid);
+        }
 
 		deltaTime += SDL_GetTicks() - begin;
 		frames++;
@@ -62,39 +109,244 @@ Quit:
 	if (NULL != window)
 		SDL_DestroyWindow(window);
 	SDL_Quit();
+    free(grid);
+    free(gridPlayer);
 	return statut;
 }
 
-void initGridPlayer(SDL_Renderer* renderer) {
-    SDL_Color drakOrange = { 255, 100, 80, 255 };
-    SDL_Color rose = { 200, 50, 150, 255 };
+void initGrid(int* grid) {
+    for (int i = 0; i < size * size; i++) {
+        grid[i] = 33;
+    }
+}
 
-    for (int i = 0; i < 10; i = i++) {
-        for (int j = 0; j < 10; j++) {
-            SDL_Rect rect = { j + (30 * j), i + (30 * i), 30,30 };
-            if (j % 2 == 0) {
-                SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
-            }else {
-                SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+void initGridPlayer(int* gridPlayer) {
+	for (int i = 0; i < size * size; i++) {
+            gridPlayer[i] = 33;
+	}
+}
+
+int transformCoord(int x, int y) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            if (i + (sizeBox * i) < x && x < (i + (sizeBox * i)) + sizeBox && j + (sizeBox * j) < y && y < (j + (sizeBox * j)) + sizeBox ){
+                return i + j * size;
             }
-            SDL_RenderFillRect(renderer, &rect);
-            SDL_RenderPresent(renderer);
         }
     }
 }
 
 
-void game() 
-{
-    //INIT
+//void game()
+//{
+//	//INIT
+//
+//	while (1)
+//	{
+//		//EVENT
+//		//UPDATE
+//		//RENDER
+//	}
+//
+//	//DESTROY
+//
+//}
 
-    while (1) 
-    {
-        //EVENT
-        //UPDATE
-        //RENDER
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
+    SDL_Color drakOrange = { 255, 100, 80, 255 };
+    SDL_Color rose = { 200, 50, 150, 255 };
+    SDL_Color black = { 0, 0, 0, 255 };
+    SDL_Color red = { 255, 0, 0, 255 };
+    SDL_Color white = { 255, 255, 255, 255 };
+    int count = size * size;
+    for (int i = 0; i < count; i++) {
+        SDL_Rect rect = { i / size + (i / size * sizeBox), i % size + (i % size * sizeBox), sizeBox,sizeBox };
+        if (gridPlayer[i] == 33) {
+            if (i % 2 == 0) {
+                SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
+            }
+            else {
+                SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+            }
+        }
+        else if (gridPlayer[i] == 66) {
+            SDL_SetRenderDrawColor(renderer, black.r, black.g, black.b, black.a);
+        }
+        else if (gridPlayer[i] == 55) {
+            SDL_SetRenderDrawColor(renderer, red.r, red.g, red.b, red.a);
+        }
+        else if (gridPlayer[i] == 0) {
+            SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+        }
+        else {
+            if (gridPlayer[i] == 1) {
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            }
+            else if (gridPlayer[i] == 2) {
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            }
+            else if (gridPlayer[i] == 3) {
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            }
+            else if (gridPlayer[i] == 4) {
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            }
+            else if (gridPlayer[i] == 5) {
+                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            }
+            else {
+                
+            }
+        }
+        SDL_RenderFillRect(renderer, &rect);
     }
+    SDL_RenderPresent(renderer);
+}
 
-    //DESTROY
+void placeBomb(int* grid, int place, int nb) {
+    int* index = malloc(sizeof(int) * (size * size));
+    for (int i = 0; i < size * size; i++) {
+        index[i] = i;
+    }
+    int nbRemove = 1;
+    int lastPosition = place;
 
+    removePosition(place + size + 1, index, &nbRemove);
+    removePosition(place + size, index, &nbRemove);
+    removePosition(place + size - 1, index, &nbRemove);
+    removePosition(place + 1, index, &nbRemove);
+    removePosition(place, index, &nbRemove);
+    removePosition(place - 1, index, &nbRemove);
+    removePosition(place - size + 1, index, &nbRemove);
+    removePosition(place - size, index, &nbRemove);
+    removePosition(place - size - 1, index, &nbRemove);
+
+    for (int i = 0; i < nb; i++) {
+        int ind = rand() % (size * size - (i + 9));
+        int position = index[ind];
+        removePosition(ind, index, &nbRemove);
+        grid[position] = 66;
+    }
+}
+
+void removePosition(int position, int* index, int* nbRemove) {
+    int lenght = (size * size) - *nbRemove;
+    if (position >= 0 && position < size * size) {
+        for (int j = position; j < lenght; j++) {
+            index[j] = index[j + 1];
+        }
+        ++* nbRemove;
+    }
+}
+
+void placeNb(int* grid) {
+    for (int i = 0; i < size * size; i++) {
+
+        if (grid[i] != 66) {
+            int nb = 0;
+            if (i % size == 0) {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i + 1, grid);
+                nb += ifBomb((i - size) + 1, grid);
+                nb += ifBomb((i + size) + 1, grid);
+            }
+            else if (i % size == size - 1) {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i - 1, grid);
+                nb += ifBomb((i - size) - 1, grid);
+                nb += ifBomb((i + size) - 1, grid);
+            }
+            else {
+                nb += ifBomb(i + size, grid);
+                nb += ifBomb(i - size, grid);
+                nb += ifBomb(i + 1, grid);
+                nb += ifBomb((i - size) + 1, grid);
+                nb += ifBomb((i + size) + 1, grid);
+                nb += ifBomb(i - 1, grid);
+                nb += ifBomb((i - size) - 1, grid);
+                nb += ifBomb((i + size) - 1, grid);
+            }
+            grid[i] = nb;
+        }
+    }
+}
+
+int ifBomb(int i, int* grid) {
+    int nbBomb = 0;
+    if (i >= 0 && i < size * size) {
+        if (grid[i] == 66) {
+            nbBomb = 1;
+        }
+    }
+    return nbBomb;
+}
+
+int play(char choice, int place, int* gridPlayer, int* grid) {
+    if (gridPlayer[place] == 33) {
+        if (choice == 'C') {
+            gridPlayer[place] = grid[place];
+
+            if (grid[place] == 66) {
+                for (int i = 0; i < size * size; i++) {
+                    if (grid[i] == 66 && gridPlayer[i] != 55) {
+                        gridPlayer[i] = grid[i];
+                    }
+                }
+                return 1;
+            }
+            else if (grid[place] == 0) {
+                if (place % size == 0) {
+
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place + 1, gridPlayer, grid);
+                    play(choice, place + size + 1, gridPlayer, grid);
+                    play(choice, place - size + 1, gridPlayer, grid);
+
+                }
+                else if (place % size == size - 1) {
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place - 1, gridPlayer, grid);
+                    play(choice, place + size - 1, gridPlayer, grid);
+                    play(choice, place - size - 1, gridPlayer, grid);
+                }
+                else {
+                    play(choice, place + size, gridPlayer, grid);
+                    play(choice, place - size, gridPlayer, grid);
+                    play(choice, place + 1, gridPlayer, grid);
+                    play(choice, place - 1, gridPlayer, grid);
+                    play(choice, place + size + 1, gridPlayer, grid);
+                    play(choice, place - size + 1, gridPlayer, grid);
+                    play(choice, place + size - 1, gridPlayer, grid);
+                    play(choice, place - size - 1, gridPlayer, grid);
+                }
+            }
+        }
+        else if (choice == 'D') {
+            gridPlayer[place] = 55;
+        }
+    }
+    else if (choice == 'E' && gridPlayer[place] == 55) {
+        gridPlayer[place] = 33;
+    }
+    return 0;
+}
+
+int verifWin(int* gridPlayer, int nbBomb, int* grid) {
+    int count = 0;
+    for (int i = 0; i < size * size; i++) {
+        if (gridPlayer[i] == 33) {
+            count++;
+        }
+        else if (gridPlayer[i] == 55 && grid[i] == 66) {
+            count++;
+        }
+    }
+    if (count == nbBomb) {
+        return 1;
+    }
+    return 0;
 }
