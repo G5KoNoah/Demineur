@@ -3,115 +3,192 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <SDL_mixer.h>
+#include <SDL_image.h>
 
-
-int size = 10;
-int sizeBox = 30;
+int size = 12;
+int sizeBox = 50;
 
 void initGrid(int* grid);
 void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer);
 void placeBomb(int* grid, int place, int nb);
 void placeNb(int* grid);
 int ifBomb(int i, int* grid);
-int play(char choice, int place, int* gridPlayer, int* grid);
+int play(int place, int* gridPlayer, int* grid);
 int verifWin(int* gridPlayer, int nbBomb, int* grid);
 void removePosition(int position, int* index, int* nbRemove);
-
+void flag(int place, int* gridPlayer);
 void initGridPlayer(int* gridPlayer);
 int transformCoord(int x, int y);
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* music);
 
 int main()
 {
-	SDL_Window* window = NULL;
-	SDL_Renderer* renderer = NULL;
-	SDL_Color orange = { 255, 127, 40, 255 };
-	int statut = EXIT_FAILURE;
-	if (0 != SDL_Init(SDL_INIT_EVERYTHING))
-	{
-		fprintf(stderr, "Erreur SDL_Init : %s", SDL_GetError());
-		goto Quit;
-	}
-	window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		size * (sizeBox + 1), size * (sizeBox + 1), SDL_WINDOW_SHOWN);
-	if (NULL == window)
-	{
-		fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
-		goto Quit;
-	}
+    SDL_Window* window = NULL;
+    SDL_Renderer* renderer = NULL;
+    Mix_Music* music = NULL;
+    SDL_Color orange = { 255, 127, 40, 255 };
+	SDL_Texture* img = NULL;
+	SDL_Surface* surf = NULL;
+    
+    int statut = EXIT_FAILURE;
 
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	if (NULL == renderer)
-	{
-		fprintf(stderr, "Erreur SDL_CreateRenderer : %s", SDL_GetError());
-		goto Quit;
-	}
+    if (0 != SDL_Init(SDL_INIT_EVERYTHING))
+    {
+        fprintf(stderr, "Erreur SDL_Init : %s", SDL_GetError());
+        close(renderer, window, music);
+    }
 
-	SDL_SetWindowTitle(window, "Demineur");
-	SDL_RaiseWindow(window);
-	statut = EXIT_SUCCESS;
-	SDL_Event event;
-	SDL_bool quit = SDL_FALSE;
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 0) == -1)// création de la configuration de la carte son
+    {
+        SDL_Log("Erreur initialisation SDL_mixer : %s", Mix_GetError());
+        close(renderer, window, music);
+    }
 
-	clock_t deltaTime = 0;
-	unsigned int frames = 0;
+
+
+
+    window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        size * (sizeBox + 1), size * (sizeBox + 1), SDL_WINDOW_SHOWN);
+    if (NULL == window)
+    {
+        fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
+        close(renderer, window, music);
+    }
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (NULL == renderer)
+    {
+        fprintf(stderr, "Erreur SDL_CreateRenderer : %s", SDL_GetError());
+        close(renderer, window, music);
+    }
+
+    SDL_SetWindowTitle(window, "Demineur");
+    SDL_RaiseWindow(window);
+    statut = EXIT_SUCCESS;
+    SDL_Event event;
+    SDL_bool quit = SDL_FALSE;
+
+    clock_t deltaTime = 0;
+    unsigned int frames = 0;
 
     int* grid = malloc(sizeof(int) * (size * size));
     int* gridPlayer = malloc(sizeof(int) * (size * size));
 
-    int nbBomb = 30;
+    int nbBomb = 10;
+    int anim = 0;
+    int replay = 0;
+    
 
+    while (!quit) 
+        {
+        if (NULL != music)
+        {
+            Mix_FreeMusic(music); // Libére en mémoire notre musique
+        }
+		music = Mix_LoadMUS("music/overtaken.mp3");
+		if (music == NULL)
+		{
+			SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
+			close(renderer, window, music);
+		}
+		Mix_PlayMusic(music, -1); // Joue notre musique
 
-
-	while (!quit) {
-		int begin = SDL_GetTicks();
+        int begin = SDL_GetTicks();
         initGrid(grid);
         initGridPlayer(gridPlayer);
         printGridPlayer(gridPlayer, renderer);
-
-		SDL_WaitEvent(&event);
-		if (event.type == SDL_QUIT)
-			quit = SDL_TRUE;
-        if (event.type == SDL_MOUSEBUTTONUP) {
-            int place = transformCoord(event.button.x, event.button.y);
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                placeBomb(grid, place, nbBomb);
-                placeNb(grid);
-            } else if (event.button.button == SDL_BUTTON_RIGHT) {
-                //a faire
+        int firstRound = 0;
+        
+        while ((SDL_PollEvent(&event) || firstRound == 0) && !quit) {
+            if (event.type == SDL_QUIT) {
+                quit = SDL_TRUE;
+                close(renderer, window, music);
+            }
+            if (event.type == SDL_MOUSEBUTTONUP) {
+                int place = transformCoord(event.button.x, event.button.y);
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    initGridPlayer(gridPlayer);
+                    placeBomb(grid, place, nbBomb);
+                    placeNb(grid);
+                    play(place, gridPlayer, grid);
+                    firstRound = 1;
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    flag(place, gridPlayer);
+                }
             }
             printGridPlayer(gridPlayer, renderer);
         }
         int finish = 0;
         int explode = 0;
         finish = verifWin(gridPlayer, nbBomb, grid);
-        while (explode == 0 && finish == 0) {
+        while ((SDL_PollEvent(&event) || explode == 0 && finish == 0 ) && !quit) {
             if (event.type == SDL_MOUSEBUTTONUP) {
                 int place = transformCoord(event.button.x, event.button.y);
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    /*explode = play(choice, place, gridPlayer, grid);*/
+                    explode = play(place, gridPlayer, grid);
                 }
                 else if (event.button.button == SDL_BUTTON_RIGHT) {
-                    //a faire
+                    flag(place, gridPlayer);
                 }
-            }
+            } else if (event.type == SDL_QUIT) {
+                quit = SDL_TRUE;
+                close(renderer, window, music);
+            }  
             printGridPlayer(gridPlayer, renderer);
             finish = verifWin(gridPlayer, nbBomb, grid);
         }
 
-		deltaTime += SDL_GetTicks() - begin;
-		frames++;
-		printf("%d\n", 1000 / deltaTime);
-	}
+        deltaTime += SDL_GetTicks() - begin;
+        frames++;
+        printf("%d\n", 1000 / deltaTime);
+		SDL_Rect rect = { 0,0, (sizeBox * size) + size,(sizeBox * size) + size };
+		if (NULL != music)
+		{
+			Mix_FreeMusic(music); // Libére en mémoire notre musique
+		}
+        if (explode == 1)
+        {
+            printf("perdu \n");
+			music = Mix_LoadMUS("music/loose.mp3");
+			if (music == NULL)
+			{
+				SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
+				close(renderer, window, music);
+			}
+			Mix_PlayMusic(music, -1); // Joue notre musique
+			surf = IMG_Load("images/barbe_noire.png");
 
-Quit:
-	if (NULL != renderer)
-		SDL_DestroyRenderer(renderer);
-	if (NULL != window)
-		SDL_DestroyWindow(window);
-	SDL_Quit();
-    free(grid);
-    free(gridPlayer);
-	return statut;
+        }
+        else {
+			printf("gagne \n");
+
+			music = Mix_LoadMUS("music/loose.mp3");
+
+			if (music == NULL)
+			{
+				SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
+				close(renderer, window, music);
+			}
+			Mix_PlayMusic(music, -1); // Joue notre musique
+			surf = IMG_Load("images/luffy.png");
+
+        }
+		img = SDL_CreateTextureFromSurface(renderer, surf);
+		SDL_FreeSurface(surf);
+		SDL_RenderCopy(renderer, img, NULL, &rect);
+		SDL_DestroyTexture(img);
+		SDL_RenderPresent(renderer);
+        printf("replay ?");
+        scanf_s("%d", &replay);
+        if (replay == 0) {
+            quit = SDL_TRUE;
+        }
+    }
+
+    close(renderer, window, music);
+    return statut;
 }
 
 void initGrid(int* grid) {
@@ -121,19 +198,20 @@ void initGrid(int* grid) {
 }
 
 void initGridPlayer(int* gridPlayer) {
-	for (int i = 0; i < size * size; i++) {
-            gridPlayer[i] = 33;
-	}
+    for (int i = 0; i < size * size; i++) {
+        gridPlayer[i] = 33;
+    }
 }
 
 int transformCoord(int x, int y) {
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
-            if (i + (sizeBox * i) < x && x < (i + (sizeBox * i)) + sizeBox && j + (sizeBox * j) < y && y < (j + (sizeBox * j)) + sizeBox ){
-                return i + j * size;
+            if (i + (sizeBox * i) < x && x < (i + (sizeBox * i)) + sizeBox && j + (sizeBox * j) < y && y < (j + (sizeBox * j)) + sizeBox) {
+                return i * size + j;
             }
         }
     }
+    return -1;
 }
 
 
@@ -153,54 +231,111 @@ int transformCoord(int x, int y) {
 //}
 
 void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
-    SDL_Color drakOrange = { 255, 100, 80, 255 };
-    SDL_Color rose = { 200, 50, 150, 255 };
-    SDL_Color black = { 0, 0, 0, 255 };
+    SDL_Color blue1 = { 34, 170, 212, 255 };
+    SDL_Color blue2 = { 84, 107, 199, 255 };
+    SDL_Color yellow1 = { 140, 130, 0, 255 };
+    SDL_Color yellow2 = { 170, 160, 0, 255 };
     SDL_Color red = { 255, 0, 0, 255 };
-    SDL_Color white = { 255, 255, 255, 255 };
+
+
+    SDL_Texture* img = NULL;
+    SDL_Surface* surf = NULL;
+
     int count = size * size;
     for (int i = 0; i < count; i++) {
         SDL_Rect rect = { i / size + (i / size * sizeBox), i % size + (i % size * sizeBox), sizeBox,sizeBox };
         if (gridPlayer[i] == 33) {
-            if (i % 2 == 0) {
-                SDL_SetRenderDrawColor(renderer, rose.r, rose.g, rose.b, rose.a);
+            if ((i / size) % 2 == 0) {
+                if (i % 2 == 0) {
+                    SDL_SetRenderDrawColor(renderer, blue1.r, blue1.g, blue1.b, blue1.a);
+                }
+                else {
+                    SDL_SetRenderDrawColor(renderer, blue2.r, blue2.g, blue2.b, blue2.a);
+                }
             }
             else {
-                SDL_SetRenderDrawColor(renderer, drakOrange.r, drakOrange.g, drakOrange.b, drakOrange.a);
+                if (i % 2 == 0) {
+                    SDL_SetRenderDrawColor(renderer, blue2.r, blue2.g, blue2.b, blue2.a);
+                }
+                else {
+                    SDL_SetRenderDrawColor(renderer, blue1.r, blue1.g, blue1.b, blue1.a);
+                }
             }
+            
         }
         else if (gridPlayer[i] == 66) {
-            SDL_SetRenderDrawColor(renderer, black.r, black.g, black.b, black.a);
+            surf = IMG_Load("images/bomb.png");
         }
         else if (gridPlayer[i] == 55) {
             SDL_SetRenderDrawColor(renderer, red.r, red.g, red.b, red.a);
-        }
-        else if (gridPlayer[i] == 0) {
-            SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
-        }
-        else {
-            if (gridPlayer[i] == 1) {
-                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            int index = SDL_GetTicks() % 3;
+            if (index == 0) {
+                surf = IMG_Load("images/flag1.png");
             }
-            else if (gridPlayer[i] == 2) {
-                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
-            }
-            else if (gridPlayer[i] == 3) {
-                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
-            }
-            else if (gridPlayer[i] == 4) {
-                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
-            }
-            else if (gridPlayer[i] == 5) {
-                SDL_SetRenderDrawColor(renderer, white.r, white.g, white.b, white.a);
+            else if (index == 1) {
+                surf = IMG_Load("images/flag2.png");
             }
             else {
+                surf = IMG_Load("images/flag3.png");
+            }
+            
+        }
+        else {
+            if ((i / size) % 2 == 0) {
+                if (i % 2 == 0) {
+                    SDL_SetRenderDrawColor(renderer, yellow1.r, yellow1.g, yellow1.b, yellow1.a);
+                }
+                else {
+                    SDL_SetRenderDrawColor(renderer, yellow2.r, yellow2.g, yellow2.b, yellow2.a);
+                }
+            }
+            else {
+                if (i % 2 == 0) {
+                    SDL_SetRenderDrawColor(renderer, yellow2.r, yellow2.g, yellow2.b, yellow2.a);
+                }
+                else {
+                    SDL_SetRenderDrawColor(renderer, yellow1.r, yellow1.g, yellow1.b, yellow1.a);
+                }
+            }
+            if (gridPlayer[i] == 1) {
+                surf = IMG_Load("images/number1.png"); 
+            }
+            else if (gridPlayer[i] == 2) {
+                surf = IMG_Load("images/number2.png");
                 
+            }
+            else if (gridPlayer[i] == 3) {
+                surf = IMG_Load("images/number3.png");
+            }
+            else if (gridPlayer[i] == 4) {
+                surf = IMG_Load("images/number4.png");
+            }
+            else if (gridPlayer[i] == 5) {
+                surf = IMG_Load("images/number5.png");
+            }
+            else if (gridPlayer[i] == 6) {
+                surf = IMG_Load("images/number6.png");
+            }
+            else if (gridPlayer[i] == 7) {
+                surf = IMG_Load("images/number7.png");
+            }
+            else if (gridPlayer[i] == 8) {
+                surf = IMG_Load("images/number8.png");
             }
         }
         SDL_RenderFillRect(renderer, &rect);
+        if (surf != NULL) {
+            img = SDL_CreateTextureFromSurface(renderer, surf);
+            SDL_FreeSurface(surf);
+            surf = NULL;
+        }
+        if (img != NULL) {
+            SDL_RenderCopy(renderer, img, NULL, &rect);
+            img = NULL;
+        }
     }
     SDL_RenderPresent(renderer);
+    SDL_DestroyTexture(img);
 }
 
 void placeBomb(int* grid, int place, int nb) {
@@ -283,56 +418,57 @@ int ifBomb(int i, int* grid) {
     return nbBomb;
 }
 
-int play(char choice, int place, int* gridPlayer, int* grid) {
+int play(int place, int* gridPlayer, int* grid) {
     if (gridPlayer[place] == 33) {
-        if (choice == 'C') {
-            gridPlayer[place] = grid[place];
+        
+        gridPlayer[place] = grid[place];
 
-            if (grid[place] == 66) {
-                for (int i = 0; i < size * size; i++) {
-                    if (grid[i] == 66 && gridPlayer[i] != 55) {
-                        gridPlayer[i] = grid[i];
-                    }
-                }
-                return 1;
-            }
-            else if (grid[place] == 0) {
-                if (place % size == 0) {
-
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place + 1, gridPlayer, grid);
-                    play(choice, place + size + 1, gridPlayer, grid);
-                    play(choice, place - size + 1, gridPlayer, grid);
-
-                }
-                else if (place % size == size - 1) {
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place - 1, gridPlayer, grid);
-                    play(choice, place + size - 1, gridPlayer, grid);
-                    play(choice, place - size - 1, gridPlayer, grid);
-                }
-                else {
-                    play(choice, place + size, gridPlayer, grid);
-                    play(choice, place - size, gridPlayer, grid);
-                    play(choice, place + 1, gridPlayer, grid);
-                    play(choice, place - 1, gridPlayer, grid);
-                    play(choice, place + size + 1, gridPlayer, grid);
-                    play(choice, place - size + 1, gridPlayer, grid);
-                    play(choice, place + size - 1, gridPlayer, grid);
-                    play(choice, place - size - 1, gridPlayer, grid);
+        if (grid[place] == 66) {
+            for (int i = 0; i < size * size; i++) {
+                if (grid[i] == 66 && gridPlayer[i] != 55) {
+                    gridPlayer[i] = grid[i];
                 }
             }
+            return 1;
         }
-        else if (choice == 'D') {
-            gridPlayer[place] = 55;
+        else if (grid[place] == 0) {
+            if (place % size == 0) {
+
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place + 1, gridPlayer, grid);
+                play(place + size + 1, gridPlayer, grid);
+                play(place - size + 1, gridPlayer, grid);
+
+            }
+            else if (place % size == size - 1) {
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place - 1, gridPlayer, grid);
+                play(place + size - 1, gridPlayer, grid);
+                play(place - size - 1, gridPlayer, grid);
+            }
+            else {
+                play(place + size, gridPlayer, grid);
+                play(place - size, gridPlayer, grid);
+                play(place + 1, gridPlayer, grid);
+                play(place - 1, gridPlayer, grid);
+                play(place + size + 1, gridPlayer, grid);
+                play(place - size + 1, gridPlayer, grid);
+                play(place + size - 1, gridPlayer, grid);
+                play(place - size - 1, gridPlayer, grid);
+            }
         }
-    }
-    else if (choice == 'E' && gridPlayer[place] == 55) {
-        gridPlayer[place] = 33;
     }
     return 0;
+}
+
+void flag(int place, int* gridPlayer) {
+    if (gridPlayer[place] == 33) {
+        gridPlayer[place] = 55;
+    } else if(gridPlayer[place] == 55){
+        gridPlayer[place] = 33;
+    }
 }
 
 int verifWin(int* gridPlayer, int nbBomb, int* grid) {
@@ -350,3 +486,21 @@ int verifWin(int* gridPlayer, int nbBomb, int* grid) {
     }
     return 0;
 }
+
+
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* music) {
+    if (NULL != renderer)
+        SDL_DestroyRenderer(renderer);
+    if (NULL != window)
+        SDL_DestroyWindow(window);
+
+    if (NULL != music)
+    {
+        Mix_FreeMusic(music); // Libére en mémoire notre musique
+    }
+
+    Mix_CloseAudio(); // Quitter correctement SDL_Mixer
+    SDL_Quit();
+}
+
+
