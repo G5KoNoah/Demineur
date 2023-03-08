@@ -5,12 +5,13 @@
 #include <string.h>
 #include <SDL_mixer.h>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 
 int size = 12;
 int sizeBox = 50;
 
 void initGrid(int* grid);
-void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer);
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer, SDL_Texture* tabImages[14]);
 void placeBomb(int* grid, int place, int nb);
 void placeNb(int* grid);
 int ifBomb(int i, int* grid);
@@ -20,48 +21,71 @@ void removePosition(int position, int* index, int* nbRemove);
 void flag(int place, int* gridPlayer);
 void initGridPlayer(int* gridPlayer);
 int transformCoord(int x, int y);
-void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* music);
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]);
+void loadImg(SDL_Surface* surf, SDL_Renderer* renderer, SDL_Texture* tabImages[14]);
+void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]);
 
 int main()
 {
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
-    Mix_Music* music = NULL;
     SDL_Color orange = { 255, 127, 40, 255 };
-	SDL_Texture* img = NULL;
 	SDL_Surface* surf = NULL;
+    Mix_Music* music = NULL;
+    SDL_Texture* tabImages[14];
+    Mix_Music* tabMusic[3];
     
     int statut = EXIT_FAILURE;
 
     if (0 != SDL_Init(SDL_INIT_EVERYTHING))
     {
         fprintf(stderr, "Erreur SDL_Init : %s", SDL_GetError());
-        close(renderer, window, music);
+        close(renderer, window, tabMusic, tabImages);
     }
-
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 0) == -1)// création de la configuration de la carte son
-    {
-        SDL_Log("Erreur initialisation SDL_mixer : %s", Mix_GetError());
-        close(renderer, window, music);
-    }
-
-
-
 
     window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         size * (sizeBox + 1), size * (sizeBox + 1), SDL_WINDOW_SHOWN);
     if (NULL == window)
     {
         fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
-        close(renderer, window, music);
+        close(renderer, window, tabMusic, tabImages);
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (NULL == renderer)
     {
         fprintf(stderr, "Erreur SDL_CreateRenderer : %s", SDL_GetError());
-        close(renderer, window, music);
+        close(renderer, window, tabMusic, tabImages);
     }
+
+	loadImg(surf, renderer, tabImages);
+
+    loadMusic ( window, music, renderer, tabMusic, tabImages);
+
+
+	if (TTF_Init() < 0)
+	{
+		printf("Impossible d'initialiser SDL_ttf : %s", TTF_GetError());
+		return 1;
+	}
+
+
+	TTF_Font* font = TTF_OpenFont("font/onePiece.ttf", 50);
+
+	/* Si la police est nulle, il y a eu une erreur */
+	if (!font)
+	{
+		printf("Erreur de création de la police : %s", TTF_GetError());
+		return 1;
+	}
+    SDL_Color textColor = { 255, 255, 255 };
+    SDL_Surface* text = TTF_RenderText_Solid(font, "Test pour sdl_ttf", textColor);
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, text);
+    //SDL_FreeSurface(text);
+
+
+
+
 
     SDL_SetWindowTitle(window, "Demineur");
     SDL_RaiseWindow(window);
@@ -75,35 +99,25 @@ int main()
     int* grid = malloc(sizeof(int) * (size * size));
     int* gridPlayer = malloc(sizeof(int) * (size * size));
 
-    int nbBomb = 10;
+    int nbBomb = 30;
     int anim = 0;
     int replay = 0;
     
 
     while (!quit) 
         {
-        if (NULL != music)
-        {
-            Mix_FreeMusic(music); // Libére en mémoire notre musique
-        }
-		music = Mix_LoadMUS("music/overtaken.mp3");
-		if (music == NULL)
-		{
-			SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
-			close(renderer, window, music);
-		}
-		Mix_PlayMusic(music, -1); // Joue notre musique
-
+        //Mix_FreeMusic(tabMusic[0]); // Libére en mémoire notre musique
+		Mix_PlayMusic(tabMusic[0], -1);
         int begin = SDL_GetTicks();
         initGrid(grid);
         initGridPlayer(gridPlayer);
-        printGridPlayer(gridPlayer, renderer);
+        printGridPlayer(gridPlayer, renderer, tabImages);
         int firstRound = 0;
         
         while ((SDL_PollEvent(&event) || firstRound == 0) && !quit) {
             if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, music);
+                close(renderer, window, tabMusic, tabImages);
             }
             if (event.type == SDL_MOUSEBUTTONUP) {
                 int place = transformCoord(event.button.x, event.button.y);
@@ -118,7 +132,7 @@ int main()
                     flag(place, gridPlayer);
                 }
             }
-            printGridPlayer(gridPlayer, renderer);
+            printGridPlayer(gridPlayer, renderer, tabImages);
         }
         int finish = 0;
         int explode = 0;
@@ -134,61 +148,102 @@ int main()
                 }
             } else if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, music);
+                close(renderer, window, tabMusic, tabImages);
             }  
-            printGridPlayer(gridPlayer, renderer);
+            printGridPlayer(gridPlayer, renderer, tabImages);
             finish = verifWin(gridPlayer, nbBomb, grid);
         }
-
-        deltaTime += SDL_GetTicks() - begin;
-        frames++;
-        printf("%d\n", 1000 / deltaTime);
+        
 		SDL_Rect rect = { 0,0, (sizeBox * size) + size,(sizeBox * size) + size };
-		if (NULL != music)
-		{
-			Mix_FreeMusic(music); // Libére en mémoire notre musique
-		}
+        SDL_Rect desrect = { 0,0, text->w,text->h };
+        Mix_PauseMusic(tabMusic[0]);
         if (explode == 1)
         {
             printf("perdu \n");
-			music = Mix_LoadMUS("music/loose.mp3");
-			if (music == NULL)
-			{
-				SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
-				close(renderer, window, music);
-			}
-			Mix_PlayMusic(music, -1); // Joue notre musique
-			surf = IMG_Load("images/barbe_noire.png");
-
+            Mix_PlayMusic(tabMusic[2], -1);
+            SDL_RenderCopy(renderer, tabImages[12], NULL, &rect);
+            SDL_RenderCopy(renderer, texture, NULL, &desrect);
+            //SDL_BlitSurface(text, NULL, window, &rect);
         }
         else {
 			printf("gagne \n");
 
-			music = Mix_LoadMUS("music/loose.mp3");
+            Mix_PlayMusic(tabMusic[1], -1);
+            SDL_RenderCopy(renderer, tabImages[13], NULL, &rect);
 
-			if (music == NULL)
-			{
-				SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
-				close(renderer, window, music);
-			}
-			Mix_PlayMusic(music, -1); // Joue notre musique
-			surf = IMG_Load("images/luffy.png");
 
         }
-		img = SDL_CreateTextureFromSurface(renderer, surf);
-		SDL_FreeSurface(surf);
-		SDL_RenderCopy(renderer, img, NULL, &rect);
-		SDL_DestroyTexture(img);
+        SDL_Delay(2000);
 		SDL_RenderPresent(renderer);
         printf("replay ?");
         scanf_s("%d", &replay);
         if (replay == 0) {
             quit = SDL_TRUE;
         }
+        deltaTime += SDL_GetTicks() - begin;
+        frames++;
+        printf("%d\n", 1000 / deltaTime);
     }
-
-    close(renderer, window, music);
+    
+    close(renderer, window, tabMusic, tabImages);
     return statut;
+}
+
+void loadImg(SDL_Surface* surf, SDL_Renderer* renderer, SDL_Texture* tabImages[14]) {
+	const char* pathImages[] =
+	{
+		"images/bomb.png",
+		"images/number1.png",
+		"images/number2.png",
+		"images/number3.png",
+		"images/number4.png",
+		"images/number5.png",
+		"images/number6.png",
+		"images/number7.png",
+		"images/number8.png",
+		"images/flag1.png",
+		"images/flag2.png",
+		"images/flag3.png",
+		"images/loose.png",
+		"images/win.png"
+	};
+
+	for (int i = 0; i < 14; i++) {
+		surf = IMG_Load(pathImages[i]);
+		if (surf != NULL) {
+			SDL_Texture* img = SDL_CreateTextureFromSurface(renderer, surf);
+			tabImages[i] = img;
+			SDL_FreeSurface(surf);
+		}
+	}
+
+}
+
+void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14])
+{
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 0) == -1)// création de la configuration de la carte son
+    {
+        SDL_Log("Erreur initialisation SDL_mixer : %s", Mix_GetError());
+        close(renderer, window, tabMusic, tabImages);
+    }
+	const char* pathMusic[] =
+	{
+		"music/overtaken.mp3",
+		"music/win.mp3",
+		"music/loose.mp3"
+	};
+
+	for (int i = 0; i < 3; i++) {
+		music = Mix_LoadMUS(pathMusic[i]);
+		if (music != NULL) {
+			tabMusic[i] = music;
+		}
+		else
+		{
+			SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
+			close(renderer, window, tabMusic, tabImages);
+		}
+	}
 }
 
 void initGrid(int* grid) {
@@ -215,31 +270,13 @@ int transformCoord(int x, int y) {
 }
 
 
-//void game()
-//{
-//	//INIT
-//
-//	while (1)
-//	{
-//		//EVENT
-//		//UPDATE
-//		//RENDER
-//	}
-//
-//	//DESTROY
-//
-//}
-
-void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
+void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer, SDL_Texture* tabImages[14]) {
     SDL_Color blue1 = { 34, 170, 212, 255 };
     SDL_Color blue2 = { 84, 107, 199, 255 };
     SDL_Color yellow1 = { 140, 130, 0, 255 };
     SDL_Color yellow2 = { 170, 160, 0, 255 };
     SDL_Color red = { 255, 0, 0, 255 };
-
-
     SDL_Texture* img = NULL;
-    SDL_Surface* surf = NULL;
 
     int count = size * size;
     for (int i = 0; i < count; i++) {
@@ -264,19 +301,19 @@ void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
             
         }
         else if (gridPlayer[i] == 66) {
-            surf = IMG_Load("images/bomb.png");
+            img = tabImages[0];
         }
         else if (gridPlayer[i] == 55) {
             SDL_SetRenderDrawColor(renderer, red.r, red.g, red.b, red.a);
-            int index = SDL_GetTicks() % 3;
-            if (index == 0) {
-                surf = IMG_Load("images/flag1.png");
+            int index = SDL_GetTicks() % 400;
+            if (0 < index && index < 200) {
+                img = tabImages[9];
             }
-            else if (index == 1) {
-                surf = IMG_Load("images/flag2.png");
-            }
+            /*else if (300 < index && index < 600) {
+                img = tabImages[10];
+            }*/
             else {
-                surf = IMG_Load("images/flag3.png");
+                img = tabImages[11];
             }
             
         }
@@ -298,44 +335,39 @@ void printGridPlayer(int* gridPlayer, SDL_Renderer* renderer) {
                 }
             }
             if (gridPlayer[i] == 1) {
-                surf = IMG_Load("images/number1.png"); 
+                img = tabImages[1];
             }
             else if (gridPlayer[i] == 2) {
-                surf = IMG_Load("images/number2.png");
+                img = tabImages[2];
                 
             }
             else if (gridPlayer[i] == 3) {
-                surf = IMG_Load("images/number3.png");
+                img = tabImages[3];
             }
             else if (gridPlayer[i] == 4) {
-                surf = IMG_Load("images/number4.png");
+                img = tabImages[4];
             }
             else if (gridPlayer[i] == 5) {
-                surf = IMG_Load("images/number5.png");
+                img = tabImages[5];
             }
             else if (gridPlayer[i] == 6) {
-                surf = IMG_Load("images/number6.png");
+                img = tabImages[6];
             }
             else if (gridPlayer[i] == 7) {
-                surf = IMG_Load("images/number7.png");
+                img = tabImages[7];
             }
             else if (gridPlayer[i] == 8) {
-                surf = IMG_Load("images/number8.png");
+                img = tabImages[8];
             }
         }
         SDL_RenderFillRect(renderer, &rect);
-        if (surf != NULL) {
-            img = SDL_CreateTextureFromSurface(renderer, surf);
-            SDL_FreeSurface(surf);
-            surf = NULL;
-        }
         if (img != NULL) {
             SDL_RenderCopy(renderer, img, NULL, &rect);
             img = NULL;
         }
     }
     SDL_RenderPresent(renderer);
-    SDL_DestroyTexture(img);
+    SDL_RenderClear(renderer);
 }
 
 void placeBomb(int* grid, int place, int nb) {
@@ -488,18 +520,20 @@ int verifWin(int* gridPlayer, int nbBomb, int* grid) {
 }
 
 
-void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* music) {
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]) {
     if (NULL != renderer)
         SDL_DestroyRenderer(renderer);
     if (NULL != window)
         SDL_DestroyWindow(window);
-
-    if (NULL != music)
-    {
-        Mix_FreeMusic(music); // Libére en mémoire notre musique
+    for (int i = 0; i < 3; i++) {
+        if (NULL != tabMusic[i])
+            Mix_FreeMusic(tabMusic[i]);
     }
-
-    Mix_CloseAudio(); // Quitter correctement SDL_Mixer
+    for (int i = 0; i < 14; i++) {
+        if (NULL != tabImages[i])
+            SDL_DestroyTexture(tabImages[i]);
+    }
+    Mix_CloseAudio();
     SDL_Quit();
 }
 
