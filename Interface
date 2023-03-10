@@ -22,9 +22,9 @@ void removePosition(int position, int* index, int* nbRemove);
 void flag(int place, int* gridPlayer);
 void initGridPlayer(int* gridPlayer);
 int transformCoord(int x, int y);
-void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]);
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14], SDL_Texture* tabText[8], SDL_Surface* tabSurf[7]);
 void loadImg(SDL_Surface* surf, SDL_Renderer* renderer, SDL_Texture* tabImages[14]);
-void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]);
+void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14], SDL_Texture* tabText[8], SDL_Surface* tabSurf[7]);
 void loadText(SDL_Surface* surfMenu, SDL_Surface* surf, SDL_Renderer* renderer, SDL_Texture* tabText[8], SDL_Surface* tabSurf[7]);
 
 int main()
@@ -33,10 +33,10 @@ int main()
     SDL_Renderer* renderer = NULL;
     SDL_Color orange = { 255, 127, 40, 255 };
     SDL_Surface* surf = NULL;
-	SDL_Surface* surfMenu = NULL;
+    SDL_Surface* surfMenu = NULL;
     Mix_Music* music = NULL;
     SDL_Texture* tabImages[15];
-	SDL_Texture* tabText[8];
+    SDL_Texture* tabText[8];
     Mix_Music* tabMusic[3];
     SDL_Surface* tabSurf[7];
 
@@ -45,7 +45,7 @@ int main()
     if (0 != SDL_Init(SDL_INIT_EVERYTHING))
     {
         fprintf(stderr, "Erreur SDL_Init : %s", SDL_GetError());
-        close(renderer, window, tabMusic, tabImages);
+        close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
     }
 
     window = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -53,14 +53,14 @@ int main()
     if (NULL == window)
     {
         fprintf(stderr, "Erreur SDL_CreateWindow : %s", SDL_GetError());
-        close(renderer, window, tabMusic, tabImages);
+        close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (NULL == renderer)
     {
         fprintf(stderr, "Erreur SDL_CreateRenderer : %s", SDL_GetError());
-        close(renderer, window, tabMusic, tabImages);
+        close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
     }
 
     if (TTF_Init() < 0)
@@ -71,10 +71,8 @@ int main()
 
     loadImg(surf, renderer, tabImages);
 
-    loadMusic(window, music, renderer, tabMusic, tabImages);
+    loadMusic(window, music, renderer, tabMusic, tabImages, tabText, tabSurf);
     loadText(surfMenu, surf, renderer, tabText, tabSurf);
-
-
 
     SDL_SetWindowTitle(window, "Demineur");
     SDL_RaiseWindow(window);
@@ -98,11 +96,11 @@ int main()
                 SDL_RenderCopy(renderer, tabText[i], NULL, &menu);
             }
         }
-		SDL_RenderPresent(renderer);
+        SDL_RenderPresent(renderer);
         while ((SDL_PollEvent(&event) || menu != 0) && !quit) {
             if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, tabMusic, tabImages);
+                close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
             }
             if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
                 if ((size * sizeBox) / 2 - tabSurf[5]->w / 2 < event.button.x &&
@@ -137,9 +135,9 @@ int main()
         }
 
 
-		SDL_SetWindowSize(window, size * (sizeBox + 1), size * (sizeBox + 1));
-		int* grid = malloc(sizeof(int) * (size * size));
-		int* gridPlayer = malloc(sizeof(int) * (size * size));
+        SDL_SetWindowSize(window, size * (sizeBox + 1), size * (sizeBox + 1));
+        int* grid = malloc(sizeof(int) * (size * size));
+        int* gridPlayer = malloc(sizeof(int) * (size * size));
 
         int replay = 0;
         int anim = 0;
@@ -153,7 +151,7 @@ int main()
         while ((SDL_PollEvent(&event) || firstRound == 0) && !quit) {
             if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, tabMusic, tabImages);
+                close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
             }
             if (event.type == SDL_MOUSEBUTTONUP) {
                 int place = transformCoord(event.button.x, event.button.y);
@@ -185,7 +183,7 @@ int main()
             }
             else if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, tabMusic, tabImages);
+                close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
             }
             if (event.type == SDL_QUIT)
                 quit = SDL_TRUE;
@@ -205,21 +203,26 @@ int main()
         SDL_Rect rectMenu = { (size * sizeBox) / 2 - tabSurf[3]->w / 2, (size * sizeBox) / 2 - tabSurf[3]->h / 2 + 200, tabSurf[3]->w, tabSurf[3]->h };
         SDL_Delay(2000);
 
+        if (explode == 1)
+        {
+            Mix_PlayMusic(tabMusic[2], -1);
+        }
+        else {
+            Mix_PlayMusic(tabMusic[1], -1);
+        }
         while ((SDL_PollEvent(&event) || replay != 1) && !quit) {
             if (explode == 1)
             {
-                Mix_PlayMusic(tabMusic[2], -1);
                 SDL_RenderCopy(renderer, tabImages[12], NULL, &rect);
                 SDL_RenderCopy(renderer, tabText[1], NULL, &textWin);
             }
             else {
-                Mix_PlayMusic(tabMusic[1], -1);
                 SDL_RenderCopy(renderer, tabImages[13], NULL, &rect);
                 SDL_RenderCopy(renderer, tabText[0], NULL, &textLoose);
             }
             if (event.type == SDL_QUIT) {
                 quit = SDL_TRUE;
-                close(renderer, window, tabMusic, tabImages);
+                close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
             }
             else if (event.type == SDL_KEYDOWN)
             {
@@ -233,15 +236,15 @@ int main()
                 }
 
             }
-			int index = SDL_GetTicks() % 400;
-			if (0 < index && index < 200) {
-				SDL_RenderCopy(renderer, tabText[2], NULL, &rectReplay);
-			}
-			else {
-				SDL_RenderCopy(renderer, tabText[7], NULL, &rectReplay);
-			}
+            int index = SDL_GetTicks() % 400;
+            if (0 < index && index < 200) {
+                SDL_RenderCopy(renderer, tabText[2], NULL, &rectReplay);
+            }
+            else {
+                SDL_RenderCopy(renderer, tabText[7], NULL, &rectReplay);
+            }
             SDL_RenderCopy(renderer, tabText[3], NULL, &rectMenu);
-			SDL_RenderPresent(renderer);
+            SDL_RenderPresent(renderer);
             SDL_RenderClear(renderer);
         }
         deltaTime += SDL_GetTicks() - begin;
@@ -308,8 +311,8 @@ void loadText(SDL_Surface* surfMenu, SDL_Surface* surf, SDL_Renderer* renderer, 
         "MEDIUM",
         "HARD"
     };
-    
-    
+
+
 
     for (int i = 0; i < 4; i++) {
         surf = TTF_RenderText_Solid(font, pathText[i], textColor);
@@ -328,19 +331,19 @@ void loadText(SDL_Surface* surfMenu, SDL_Surface* surf, SDL_Renderer* renderer, 
             tabSurf[i] = surfMenu;
         }
     }
-	surfMenu = TTF_RenderText_Solid(fontMenu, pathText[2], textColorMenu);
-	SDL_Texture* textMenu = SDL_CreateTextureFromSurface(renderer, surfMenu);
-	tabText[7] = textMenu;
-	SDL_FreeSurface(surfMenu);
+    surfMenu = TTF_RenderText_Solid(fontMenu, pathText[2], textColorMenu);
+    SDL_Texture* textMenu = SDL_CreateTextureFromSurface(renderer, surfMenu);
+    tabText[7] = textMenu;
+    SDL_FreeSurface(surfMenu);
 
 }
 
-void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14])
+void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14], SDL_Texture* tabText[8], SDL_Surface* tabSurf[7])
 {
     if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 0) == -1)// création de la configuration de la carte son
     {
         SDL_Log("Erreur initialisation SDL_mixer : %s", Mix_GetError());
-        close(renderer, window, tabMusic, tabImages);
+        close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
     }
     const char* pathMusic[] =
     {
@@ -357,7 +360,7 @@ void loadMusic(SDL_Window* window, Mix_Music* music, SDL_Renderer* renderer, Mix
         else
         {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Erreur chargement de la musique : %s", Mix_GetError());
-            close(renderer, window, tabMusic, tabImages);
+            close(renderer, window, tabMusic, tabImages, tabText, tabSurf);
         }
     }
     Mix_VolumeMusic(MIX_MAX_VOLUME / 8);
@@ -638,7 +641,7 @@ int verifWin(int* gridPlayer, int nbBomb, int* grid) {
 }
 
 
-void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14]) {
+void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], SDL_Texture* tabImages[14], SDL_Texture* tabText[8], SDL_Surface* tabSurf[7]) {
     if (NULL != renderer)
         SDL_DestroyRenderer(renderer);
     if (NULL != window)
@@ -650,6 +653,14 @@ void close(SDL_Renderer* renderer, SDL_Window* window, Mix_Music* tabMusic[3], S
     for (int i = 0; i < 14; i++) {
         if (NULL != tabImages[i])
             SDL_DestroyTexture(tabImages[i]);
+    }
+    for (int i = 0; i < 8; i++) {
+        if (NULL != tabText[i])
+            SDL_DestroyTexture(tabText[i]);
+    }
+    for (int i = 0; i < 7; i++) {
+        if (NULL != tabSurf[i])
+            SDL_DestroyTexture(tabSurf[i]);
     }
     Mix_CloseAudio();
     SDL_Quit();
